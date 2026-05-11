@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -114,11 +115,13 @@ func runUpdate() {
 	// Extract
 	fmt.Println(infoStyle.Render("Extracting..."))
 
-	extractedBinary := tmpDir + "/contextsync"
-	if err := extractFile(tmpFile, extractedBinary, goos); err != nil {
+	extractedBinary, err := extractFile(tmpFile, tmpDir+"/contextsync", goos)
+	if err != nil {
 		fmt.Println(errorStyle.Render("Failed to extract: " + err.Error()))
 		os.Exit(1)
 	}
+
+	fmt.Printf("Extracted binary: %s\n", extractedBinary)
 
 	// Find current binary path
 	currentBinary, err := os.Executable()
@@ -221,26 +224,61 @@ func (wc *writeCounter) PrintProgress() {
 	fmt.Printf("\r    Downloaded: %.2f MB", float64(wc.Total)/1024/1024)
 }
 
-func extractFile(archive, dest, goos string) error {
-	// Change to temp directory
-	dir := dest[:strings.LastIndex(dest, "/")]
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("cd %s && tar -xzf %s", dir, archive))
+func extractFile(archive, expectedDest, goos string) (string, error) {
+	// Get directory from expected destination
+	dir := filepath.Dir(expectedDest)
 
+	var cmd *exec.Cmd
 	if goos == "windows" {
 		cmd = exec.Command("powershell", "-c", fmt.Sprintf("Expand-Archive -Path %s -DestinationPath %s", archive, dir))
+	} else {
+		cmd = exec.Command("sh", "-c", fmt.Sprintf("cd %s && tar -xzf %s", dir, archive))
 	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s: %s", err, string(output))
+		return "", fmt.Errorf("extract failed: %s: %s", err, string(output))
+	}
+
+	// Find the extracted binary (may have platform suffix like contextsync-darwin-arm64)
+	var extractedBinary string
+	candidates := []string{
+		expectedDest,                              // contextsync
+		dir + "/contextsync",                      // contextsync
+	}
+
+	// Also check for platform-suffixed binary
+	arch := runtime.GOARCH
+	if arch == "x86_64" || arch == "amd64" {
+		arch = "amd64"
+	} else if arch == "arm64" || arch == "aarch64" {
+		arch = "arm64"
+	}
+	candidates = append(candidates, dir+"/contextsync-"+goos+"-"+arch)
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			extractedBinary = candidate
+			break
+		}
+	}
+
+	if extractedBinary == "" {
+		// List files in directory for debugging
+		files, _ := os.ReadDir(dir)
+		fileList := make([]string, 0)
+		for _, f := range files {
+			fileList = append(fileList, f.Name())
+		}
+		return "", fmt.Errorf("could not find extracted binary in %s. Files: %v", dir, fileList)
 	}
 
 	// Make executable
-	if err := os.Chmod(dest, 0755); err != nil {
-		return err
+	if err := os.Chmod(extractedBinary, 0755); err != nil {
+		return "", fmt.Errorf("chmod failed: %w", err)
 	}
 
-	return nil
+	return extractedBinary, nil
 }
 
 func replaceBinary(newBinary, currentBinary string) error {

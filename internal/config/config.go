@@ -52,7 +52,29 @@ func Init() error {
 		}
 	}
 
+	// Migrate old server URLs to new one
+	migrateOldServerURL()
+
 	return nil
+}
+
+// migrateOldServerURL migrates old API URLs to the new server URL
+func migrateOldServerURL() {
+	currentURL := viper.GetString("server_url")
+	oldURLs := []string{
+		"https://api.contextsync.dev",
+		"http://api.contextsync.dev",
+		"https://contextsync.dev",
+		"http://contextsync.dev",
+	}
+
+	for _, oldURL := range oldURLs {
+		if currentURL == oldURL {
+			viper.Set("server_url", "https://contextsync.yangqing.one")
+			viper.WriteConfig()
+			return
+		}
+	}
 }
 
 // SetConfigFile sets a specific config file

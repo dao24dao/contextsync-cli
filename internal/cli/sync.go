@@ -78,7 +78,7 @@ func runSync() {
 	// Create sync client
 	serverURL := config.GetServerURL()
 	if serverURL == "" {
-		serverURL = "https://api.contextsync.dev"
+		serverURL = "https://contextsync.yangqing.one"
 	}
 	client := cloud.NewClient(serverURL)
 
