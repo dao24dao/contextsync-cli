@@ -42,7 +42,7 @@ func Init() error {
 
 	// Set defaults
 	viper.SetDefault("device_id", uuid.New().String())
-	viper.SetDefault("server_url", "https://api.contextsync.dev")
+	viper.SetDefault("server_url", "https://contextsync.yangqing.one")
 
 	// Read config
 	if err := viper.ReadInConfig(); err != nil {
