@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/charmbracelet/lipgloss v0.11.0
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	github.com/spf13/cobra v1.8.1
@@ -15,7 +16,6 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/x/ansi v0.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

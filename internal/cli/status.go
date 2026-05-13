@@ -119,7 +119,7 @@ func runStatus() {
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("  Upgrade to Pro:"))
 		fmt.Println("    contextsync upgrade")
 		fmt.Println()
-		fmt.Println("  Plans: Monthly $9 | Quarterly $24 | Yearly $72")
+		fmt.Println("  Plans: Monthly $9 | Quarterly $24 | Yearly $89")
 	}
 
 	fmt.Println()

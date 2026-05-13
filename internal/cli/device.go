@@ -35,41 +35,60 @@ func registerDevice() error {
 
 	jsonBody, _ := json.Marshal(body)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	var lastErr error
+	maxRetries := 3
 
-	req, err := http.NewRequestWithContext(ctx, "POST",
-		serverURL+"/api/v1/register-device",
-		bytes.NewReader(jsonBody))
-	if err != nil {
-		return err
-	}
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to connect to server: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 403 {
-		var result struct {
-			Error       string `json:"error"`
-			DeviceCount int    `json:"device_count"`
-			DeviceLimit int    `json:"device_limit"`
+		req, err := http.NewRequestWithContext(ctx, "POST",
+			serverURL+"/api/v1/register-device",
+			bytes.NewReader(jsonBody))
+		if err != nil {
+			cancel()
+			return err
 		}
-		json.NewDecoder(resp.Body).Decode(&result)
-		return fmt.Errorf("device limit reached (%d/%d). Please remove a device from your dashboard", result.DeviceCount, result.DeviceLimit)
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = fmt.Errorf("failed to connect to server (attempt %d/%d): %w", attempt, maxRetries, err)
+			if attempt < maxRetries {
+				time.Sleep(time.Duration(attempt) * time.Second)
+			}
+			continue
+		}
+		cancel()
+
+		if resp.StatusCode == 403 {
+			var result struct {
+				Error       string `json:"error"`
+				DeviceCount int    `json:"device_count"`
+				DeviceLimit int    `json:"device_limit"`
+			}
+			json.NewDecoder(resp.Body).Decode(&result)
+			resp.Body.Close()
+			return fmt.Errorf("device limit reached (%d/%d). Please remove a device from your dashboard", result.DeviceCount, result.DeviceLimit)
+		}
+
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("registration failed with status %d (attempt %d/%d)", resp.StatusCode, attempt, maxRetries)
+			if attempt < maxRetries {
+				time.Sleep(time.Duration(attempt) * time.Second)
+			}
+			continue
+		}
+
+		resp.Body.Close()
+		return nil
 	}
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("registration failed with status %d", resp.StatusCode)
-	}
-
-	return nil
+	return lastErr
 }
 
 // getDeviceName returns a human-readable device name

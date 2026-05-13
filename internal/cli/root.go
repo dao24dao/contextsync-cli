@@ -52,6 +52,7 @@ func init() {
 	rootCmd.AddCommand(rulesCmd)
 	rootCmd.AddCommand(memoriesCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(daemonCmd)
 }
 
 func initConfig() {

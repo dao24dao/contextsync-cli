@@ -75,7 +75,7 @@ type SubscriptionPlan struct {
 var SubscriptionPlans = []SubscriptionPlan{
 	{SubscriptionMonthly, "Monthly", 900, "$9/month", ""},
 	{SubscriptionQuarterly, "Quarterly", 2400, "$24/quarter", "Save 11%"},
-	{SubscriptionYearly, "Yearly", 7200, "$72/year", "Save 33%"},
+	{SubscriptionYearly, "Yearly", 8900, "$89/year", "Save 18%"},
 }
 
 type Features struct {

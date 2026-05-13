@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"contextsync/internal/config"
+	"contextsync/internal/daemon"
 	"contextsync/internal/integrations"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -64,10 +65,11 @@ func runInit() {
 	// Register device with server
 	fmt.Println(infoStyle.Render("  Registering device..."))
 	if err := registerDevice(); err != nil {
-		fmt.Printf("  Warning: %v\n", err)
-	} else {
-		fmt.Println(successStyle.Render("  Device registered\n"))
+		fmt.Printf("  Error: %v\n", err)
+		fmt.Println("\n  Device registration failed. Please check your network and try again.")
+		return
 	}
+	fmt.Println(successStyle.Render("  Device registered\n"))
 
 	// Check license status
 	maxTools := validator.GetMaxTools()
@@ -141,6 +143,27 @@ func runInit() {
 	} else {
 		fmt.Println(successStyle.Render("  Created ~/.contextsync/rules.md\n"))
 	}
+
+	// Step 6: Install daemon service
+	fmt.Println(infoStyle.Render("  Setting up daemon..."))
+	svc := daemon.NewServiceManager()
+
+	if svc.IsInstalled() {
+		fmt.Println("  Daemon already installed")
+	} else {
+		if err := svc.Install(); err != nil {
+			fmt.Printf("  Warning: Failed to install daemon: %v\n", err)
+		} else {
+			fmt.Println(successStyle.Render("  Daemon service installed"))
+			// Start the daemon
+			if err := svc.Start(); err != nil {
+				fmt.Printf("  Warning: Failed to start daemon: %v\n", err)
+			} else {
+				fmt.Println(successStyle.Render("  Daemon started"))
+			}
+		}
+	}
+	fmt.Println()
 
 	// Done
 	fmt.Println(titleStyle.Render("ContextSync initialized successfully!\n"))
