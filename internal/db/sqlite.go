@@ -149,6 +149,10 @@ func runMigrations(db *sql.DB) error {
 		`ALTER TABLE license ADD COLUMN subscription_type TEXT`,
 		// Add expires_at index if not exists
 		`CREATE INDEX IF NOT EXISTS idx_memories_expires ON memories(expires_at)`,
+		// Add signature columns for license verification
+		`ALTER TABLE license ADD COLUMN signature TEXT`,
+		`ALTER TABLE license ADD COLUMN signed_at TEXT`,
+		`ALTER TABLE license ADD COLUMN account_id TEXT`,
 	}
 
 	for _, m := range migrations {

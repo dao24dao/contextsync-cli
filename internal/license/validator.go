@@ -3,7 +3,9 @@ package license
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,8 +16,13 @@ import (
 )
 
 const (
-	TrialDays = 14
+	TrialDays        = 14
+	SignatureMaxAge  = 7 * 24 * time.Hour // Signature valid for 7 days offline
 )
+
+// Embedded public key for signature verification
+// This should be replaced with the actual public key from the server
+var embeddedPublicKey ed25519.PublicKey
 
 type Validator struct {
 	db         *sql.DB
@@ -32,6 +39,10 @@ type LicenseCache struct {
 	ExpiresAt      time.Time `json:"expires_at"`
 	FirstSeenAt    time.Time `json:"first_seen_at"`
 	CachedAt       time.Time `json:"cached_at"`
+	// Signature fields
+	Signature string    `json:"signature"`
+	SignedAt  time.Time `json:"signed_at"`
+	AccountID string    `json:"account_id"`
 }
 
 type LicenseStatus struct {
@@ -39,6 +50,10 @@ type LicenseStatus struct {
 	Tier           string    `json:"tier"`
 	SubscriptionID string    `json:"subscription_id"`
 	ExpiresAt      time.Time `json:"expires_at"`
+	// Signature fields
+	Signature string `json:"signature"`
+	SignedAt  string `json:"signed_at"`
+	AccountID string `json:"account_id"`
 }
 
 type SubscriptionType string
@@ -71,6 +86,19 @@ type Features struct {
 	TrialExpired    bool   `json:"trial_expired"`
 }
 
+// SetPublicKey sets the embedded public key for signature verification
+func SetPublicKey(pubKeyBase64 string) error {
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(pubKeyBase64)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key: %w", err)
+	}
+	if len(pubKeyBytes) != ed25519.PublicKeySize {
+		return fmt.Errorf("invalid public key size: %d", len(pubKeyBytes))
+	}
+	embeddedPublicKey = ed25519.PublicKey(pubKeyBytes)
+	return nil
+}
+
 // NewValidator creates a new license validator
 func NewValidator(serverURL string) *Validator {
 	return &Validator{
@@ -89,11 +117,14 @@ func (v *Validator) SetDB(database *db.SQLite) {
 
 func (v *Validator) loadFromDB() {
 	var tier, licenseKey string
-	var validUntil, firstSeenAt, subscriptionType sql.NullString
+	var validUntil, firstSeenAt, subscriptionType, signature, signedAt, accountID sql.NullString
 
 	err := v.db.QueryRow(`
-		SELECT tier, license_key, valid_until, first_seen_at, subscription_type FROM license WHERE id = 1
-	`).Scan(&tier, &licenseKey, &validUntil, &firstSeenAt, &subscriptionType)
+		SELECT tier, license_key, valid_until, first_seen_at, subscription_type,
+		       signature, signed_at, account_id
+		FROM license WHERE id = 1
+	`).Scan(&tier, &licenseKey, &validUntil, &firstSeenAt, &subscriptionType,
+		&signature, &signedAt, &accountID)
 
 	if err == nil {
 		v.cache = &LicenseCache{
@@ -109,7 +140,35 @@ func (v *Validator) loadFromDB() {
 		if subscriptionType.Valid {
 			v.cache.SubscriptionID = subscriptionType.String
 		}
+		if signature.Valid {
+			v.cache.Signature = signature.String
+		}
+		if signedAt.Valid {
+			v.cache.SignedAt, _ = time.Parse(time.RFC3339, signedAt.String)
+		}
+		if accountID.Valid {
+			v.cache.AccountID = accountID.String
+		}
 	}
+}
+
+// verifySignature verifies the license signature
+func (v *Validator) verifySignature(tier, expiresAt, accountID, signature string) bool {
+	if embeddedPublicKey == nil || signature == "" {
+		return false
+	}
+
+	// Build the data that was signed
+	data := fmt.Sprintf("%s|%s|%s", tier, expiresAt, accountID)
+
+	// Decode signature
+	sigBytes, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		return false
+	}
+
+	// Verify with Ed25519
+	return ed25519.Verify(embeddedPublicKey, []byte(data), sigBytes)
 }
 
 // IsPro checks if the user has a valid Pro license
@@ -119,7 +178,7 @@ func (v *Validator) IsPro() bool {
 
 	// Check cache first (valid for 24 hours)
 	if v.cache != nil && time.Since(v.cache.CachedAt) < 24*time.Hour {
-		return v.cache.Tier == "pro" && v.cache.Valid
+		return v.isProFromCache()
 	}
 
 	// Validate with server
@@ -129,23 +188,79 @@ func (v *Validator) IsPro() bool {
 
 		status, err := v.validateWithServer(ctx)
 		if err == nil {
-			v.cache = &LicenseCache{
-				Tier:           status.Tier,
-				SubscriptionID: status.SubscriptionID,
-				Valid:          status.Valid,
-				ExpiresAt:      status.ExpiresAt,
-				CachedAt:       time.Now(),
-			}
+			v.updateCacheFromServer(status)
 			return status.Tier == "pro" && status.Valid
 		}
 	}
 
-	// Fall back to cached value
-	if v.cache != nil {
-		return v.cache.Tier == "pro"
+	// Fall back to cached value with signature verification
+	return v.isProFromCache()
+}
+
+// isProFromCache checks Pro status from cache with signature verification
+func (v *Validator) isProFromCache() bool {
+	if v.cache == nil {
+		return false
 	}
 
-	return false
+	// Free tier doesn't need signature
+	if v.cache.Tier != "pro" {
+		return false
+	}
+
+	// For Pro tier, require valid signature
+	if v.cache.Signature == "" {
+		return false
+	}
+
+	// Check signature age
+	if !v.cache.SignedAt.IsZero() && time.Since(v.cache.SignedAt) > SignatureMaxAge {
+		return false // Signature too old
+	}
+
+	// Verify signature
+	expiresAt := ""
+	if !v.cache.ExpiresAt.IsZero() {
+		expiresAt = v.cache.ExpiresAt.Format(time.RFC3339)
+	}
+
+	if !v.verifySignature(v.cache.Tier, expiresAt, v.cache.AccountID, v.cache.Signature) {
+		return false // Invalid signature
+	}
+
+	return v.cache.Valid
+}
+
+// updateCacheFromServer updates the cache from server response
+func (v *Validator) updateCacheFromServer(status *LicenseStatus) {
+	v.cache = &LicenseCache{
+		Tier:           status.Tier,
+		SubscriptionID: status.SubscriptionID,
+		Valid:          status.Valid,
+		ExpiresAt:      status.ExpiresAt,
+		CachedAt:       time.Now(),
+		Signature:      status.Signature,
+		AccountID:      status.AccountID,
+	}
+	if status.SignedAt != "" {
+		v.cache.SignedAt, _ = time.Parse(time.RFC3339, status.SignedAt)
+	}
+
+	// Update database
+	if v.db != nil && status.Tier == "pro" {
+		v.db.Exec(`
+			UPDATE license SET
+				tier = ?,
+				subscription_type = ?,
+				valid_until = ?,
+				signature = ?,
+				signed_at = ?,
+				account_id = ?,
+				updated_at = datetime('now')
+			WHERE id = 1
+		`, status.Tier, status.SubscriptionID, status.ExpiresAt.Format(time.RFC3339),
+			status.Signature, status.SignedAt, status.AccountID)
+	}
 }
 
 // GetTier returns the current tier
@@ -296,27 +411,8 @@ func (v *Validator) Activate(licenseKey string) error {
 
 	// Update local cache and database
 	v.mu.Lock()
-	v.cache = &LicenseCache{
-		Tier:           status.Tier,
-		SubscriptionID: status.SubscriptionID,
-		Valid:          status.Valid,
-		ExpiresAt:      status.ExpiresAt,
-		CachedAt:       time.Now(),
-	}
+	v.updateCacheFromServer(&status)
 	v.mu.Unlock()
-
-	// Update database
-	if v.db != nil {
-		v.db.Exec(`
-			UPDATE license SET
-				tier = ?,
-				license_key = ?,
-				subscription_type = ?,
-				valid_until = ?,
-				updated_at = datetime('now')
-			WHERE id = 1
-		`, status.Tier, licenseKey, status.SubscriptionID, status.ExpiresAt.Format(time.RFC3339))
-	}
 
 	return nil
 }
@@ -342,6 +438,9 @@ func (v *Validator) Deactivate() {
 				license_key = NULL,
 				subscription_type = NULL,
 				valid_until = NULL,
+				signature = NULL,
+				signed_at = NULL,
+				account_id = NULL,
 				updated_at = datetime('now')
 			WHERE id = 1
 		`)
