@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	AppName = "contextsync"
+	AppName    = "contextsync"
+	serverURL  = "https://contextsync.yangqing.one"
 )
 
 var (
@@ -40,9 +41,8 @@ func Init() error {
 	viper.SetConfigType("json")
 	viper.AddConfigPath(configDir)
 
-	// Set defaults
+	// Set defaults (device_id only, server_url is hardcoded)
 	viper.SetDefault("device_id", uuid.New().String())
-	viper.SetDefault("server_url", "https://contextsync.yangqing.one")
 
 	// Read config
 	if err := viper.ReadInConfig(); err != nil {
@@ -52,29 +52,7 @@ func Init() error {
 		}
 	}
 
-	// Migrate old server URLs to new one
-	migrateOldServerURL()
-
 	return nil
-}
-
-// migrateOldServerURL migrates old API URLs to the new server URL
-func migrateOldServerURL() {
-	currentURL := viper.GetString("server_url")
-	oldURLs := []string{
-		"https://api.contextsync.dev",
-		"http://api.contextsync.dev",
-		"https://contextsync.dev",
-		"http://contextsync.dev",
-	}
-
-	for _, oldURL := range oldURLs {
-		if currentURL == oldURL {
-			viper.Set("server_url", "https://contextsync.yangqing.one")
-			viper.WriteConfig()
-			return
-		}
-	}
 }
 
 // SetConfigFile sets a specific config file
@@ -120,9 +98,9 @@ func GetRulesPath() string {
 	return filepath.Join(configDir, "rules.md")
 }
 
-// GetServerURL returns the server URL for API calls
+// GetServerURL returns the server URL for API calls (hardcoded, cannot be changed)
 func GetServerURL() string {
-	return viper.GetString("server_url")
+	return serverURL
 }
 
 // GetDeviceID returns the device ID

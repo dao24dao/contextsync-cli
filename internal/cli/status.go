@@ -25,27 +25,71 @@ func runStatus() {
 	proStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
 	freeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B"))
 	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6"))
 
 	fmt.Println(titleStyle.Render("\nContextSync Status\n"))
 
 	// Version
 	fmt.Printf("  %-12s %s\n", labelStyle.Render("Version:"), valueStyle.Render(version))
 
+	// Device ID (always available locally)
+	fmt.Printf("  %-12s %s\n", labelStyle.Render("Device ID:"), valueStyle.Render(config.GetDeviceID()))
+
+	// Memory stats (always available locally)
+	ensureDatabase()
+	memRepo := getMemoryRepo()
+	stats := memRepo.GetStats()
+
+	fmt.Println()
+	fmt.Println(titleStyle.Render("Local Storage:"))
+	fmt.Printf("  %-12s %d memories\n", labelStyle.Render("Total:"), stats.Total)
+	if stats.Expiring > 0 {
+		fmt.Printf("  %-12s %d expiring soon\n", labelStyle.Render("Warning:"), stats.Expiring)
+	}
+
 	// Check login status
 	if !config.IsLoggedIn() {
+		// Not logged in - show limited info with friendly prompt
 		fmt.Println()
+		fmt.Println(titleStyle.Render("Account:"))
 		fmt.Println(warnStyle.Render("  Not logged in"))
-		fmt.Println("\n  Please login first:")
-		fmt.Println("    contextsync login\n")
+
+		// Configured tools (from local DB)
+		var toolCount int
+		database.DB().QueryRow("SELECT COUNT(*) FROM configured_tools").Scan(&toolCount)
+		fmt.Println()
+		fmt.Println(titleStyle.Render("Tools:"))
+		fmt.Printf("  %-12s %d / 2\n", labelStyle.Render("Configured:"), toolCount)
+
+		// Features available without login
+		fmt.Println()
+		fmt.Println(titleStyle.Render("Features:"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("View Status:"), proStyle.Render("✓"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("Memory (14 days):"), proStyle.Render("✓"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("Cloud Sync:"), freeStyle.Render("✗"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("Save Memory:"), freeStyle.Render("✗"))
+
+		// Friendly prompt
+		fmt.Println()
+		fmt.Println(infoStyle.Render("  💡 Login to unlock more features:"))
+		fmt.Println("    contextsync login")
+		fmt.Println()
+		fmt.Println("  Login benefits:")
+		fmt.Println("    • Sync to 12+ AI tools (Free: 2)")
+		fmt.Println("    • Cloud sync across devices")
+		fmt.Println("    • Permanent memory storage")
+		fmt.Println("    • Priority support")
+		fmt.Println()
 		return
 	}
 
-	// Account info
-	fmt.Printf("  %-12s %s\n", labelStyle.Render("Account:"), valueStyle.Render(config.GetAccountEmail()))
+	// Logged in - show full info
+	fmt.Println()
+	fmt.Println(titleStyle.Render("Account:"))
+	fmt.Printf("  %-12s %s\n", labelStyle.Render("Email:"), valueStyle.Render(config.GetAccountEmail()))
 
 	// Initialize validator
 	validator := license.NewValidator(config.GetServerURL())
-	ensureDatabase()
 	validator.SetDB(database)
 
 	// License tier
@@ -64,22 +108,7 @@ func runStatus() {
 			}
 		}
 	} else {
-		fmt.Printf("  %-12s %s\n", labelStyle.Render("License:"), freeStyle.Render("Free"))
-	}
-
-	// Device info
-	fmt.Printf("  %-12s %s\n", labelStyle.Render("Device ID:"), config.GetDeviceID())
-
-	// Memory stats
-	memRepo := getMemoryRepo()
-	stats := memRepo.GetStats()
-
-	fmt.Println()
-	fmt.Println(titleStyle.Render("Storage:"))
-	fmt.Printf("  %-12s %d memories\n", labelStyle.Render("Total:"), stats.Total)
-
-	if stats.Expiring > 0 && tier == "free" {
-		fmt.Printf("  %-12s %d expiring soon\n", labelStyle.Render("Warning:"), stats.Expiring)
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("License:"), freeStyle.Render("Free (14 days)"))
 	}
 
 	// Configured tools
@@ -104,9 +133,9 @@ func runStatus() {
 
 	checkIcon := func(enabled bool) string {
 		if enabled {
-			return proStyle.Render("ok")
+			return proStyle.Render("✓")
 		}
-		return freeStyle.Render("x")
+		return freeStyle.Render("✗")
 	}
 
 	fmt.Printf("  %-12s %s\n", labelStyle.Render("Cloud Sync:"), checkIcon(features.CanSync))
