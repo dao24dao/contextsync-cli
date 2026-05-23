@@ -68,7 +68,18 @@ chmod +x "$BINARY_PATH"
 
 echo -e "${GREEN}Installation complete!${NC}"
 echo
+
+# Install daemon automatically
+echo -e "${YELLOW}Installing daemon...${NC}"
+if "$BINARY_PATH" daemon install; then
+    echo -e "${GREEN}✓ Daemon installed successfully${NC}"
+else
+    echo -e "${YELLOW}! Daemon installation skipped (can be installed later with: contextsync daemon install)${NC}"
+fi
+
+echo
 echo "  Get started:"
+echo "    contextsync login"
 echo "    contextsync init"
 echo
 echo "  Documentation: https://contextsync.dev/docs"

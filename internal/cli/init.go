@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
 
 	"contextsync/internal/config"
 	"contextsync/internal/daemon"
@@ -89,7 +92,11 @@ func runInit() {
 	fmt.Println(infoStyle.Render("  Detecting AI tools..."))
 	detector := integrations.NewDetector()
 	tools := detector.DetectAll()
-	totalSupported := integrations.GetToolCount()
+
+	// Styles for interactive selection
+	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
+	disabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
 
 	if len(tools) == 0 {
 		fmt.Println("  No AI tools detected")
@@ -100,38 +107,27 @@ func runInit() {
 	}
 	fmt.Println()
 
-	// Step 4: Configure MCP for each tool (with limit enforcement)
-	if len(tools) > 0 {
+	// Step 4: Tool selection for Free tier
+	var toolsToConfigure []*integrations.Tool
+
+	if !validator.IsPro() && len(tools) > maxTools {
+		// Free tier: let user select which tools to configure
+		toolsToConfigure = selectToolsInteractive(tools, maxTools, titleStyle, selectedStyle, disabledStyle, hintStyle)
+	} else {
+		toolsToConfigure = tools
+	}
+
+	// Step 5: Configure MCP for each tool
+	if len(toolsToConfigure) > 0 {
 		fmt.Println(infoStyle.Render("  Configuring MCP server..."))
 
-		// Check how many tools are already configured
-		configuredCount := getPreviouslyConfiguredCount()
-		newlyConfigured := 0
-		skippedTools := 0
-
-		for _, tool := range tools {
-			// Check if we can configure more tools
-			if !validator.IsPro() && (configuredCount+newlyConfigured) >= maxTools {
-				fmt.Printf("  %s: skipped (Free tier limited to %d tools)\n", tool.Name, maxTools)
-				skippedTools++
-				continue
-			}
-
+		for _, tool := range toolsToConfigure {
 			if err := tool.Configure(); err != nil {
 				fmt.Printf("  %s: %v\n", tool.Name, err)
 			} else {
 				fmt.Printf("  Configured: %s\n", tool.Name)
-				newlyConfigured++
-				// Record in database
 				recordToolConfiguration(tool.Name, tool.ConfigPath)
 			}
-		}
-
-		// Show upgrade prompt if tools were skipped
-		if skippedTools > 0 {
-			fmt.Println()
-			fmt.Printf("  %s\n", warnStyle.Render(fmt.Sprintf("Skipped %d tools. Pro supports all %d tools.", skippedTools, totalSupported)))
-			fmt.Printf("  Upgrade: %s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("contextsync upgrade"))
 		}
 		fmt.Println()
 	}
@@ -197,4 +193,68 @@ func recordToolConfiguration(name, configPath string) {
 func init() {
 	// Add force flag to bypass limits
 	initCmd.Flags().BoolP("force", "f", false, "Force configure all tools (ignores limits)")
+}
+
+// selectToolsInteractive displays an interactive tool selector for Free tier
+func selectToolsInteractive(tools []*integrations.Tool, maxSelect int, titleStyle, selectedStyle, disabledStyle, hintStyle lipgloss.Style) []*integrations.Tool {
+	selected := make(map[int]bool)
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Println()
+		fmt.Println(titleStyle.Render("  Select " + fmt.Sprint(maxSelect) + " tools to configure:"))
+		fmt.Println()
+
+		for i, tool := range tools {
+			prefix := "  [ ] "
+			toolName := tool.Name
+			style := lipgloss.NewStyle()
+
+			if selected[i] {
+				prefix = "  [x] "
+				style = selectedStyle
+			} else if len(selected) >= maxSelect {
+				prefix = "  [ ] "
+				toolName += " (disabled)"
+				style = disabledStyle
+			}
+
+			fmt.Println(style.Render(prefix + toolName))
+		}
+
+		fmt.Println()
+		fmt.Print(hintStyle.Render("  Enter numbers to toggle (e.g., 1,3) or press Enter to confirm: "))
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if input == "" {
+			if len(selected) == maxSelect {
+				break
+			}
+			fmt.Println(hintStyle.Render("  Please select exactly " + fmt.Sprint(maxSelect) + " tools."))
+			continue
+		}
+
+		parts := strings.Split(input, ",")
+		for _, part := range parts {
+			var num int
+			if _, err := fmt.Sscanf(strings.TrimSpace(part), "%d", &num); err == nil {
+				idx := num - 1
+				if idx >= 0 && idx < len(tools) {
+					if selected[idx] {
+						delete(selected, idx)
+					} else if len(selected) < maxSelect {
+						selected[idx] = true
+					}
+				}
+			}
+		}
+	}
+
+	var result []*integrations.Tool
+	for i := range selected {
+		result = append(result, tools[i])
+	}
+	return result
 }
