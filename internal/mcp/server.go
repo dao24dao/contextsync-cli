@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"contextsync/internal/db"
 	"contextsync/internal/license"
@@ -203,7 +204,12 @@ func (s *Server) handleListMemories(ctx context.Context, req *mcp.CallToolReques
 
 // Run starts the MCP server using stdio transport
 func (s *Server) Run() error {
-	return s.mcpServer.Run(context.Background(), &mcp.StdioTransport{})
+	fmt.Fprintln(os.Stderr, "ContextSync MCP server started (stdio transport, waiting for client connection)")
+	if err := s.mcpServer.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+		fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 func truncate(s string, max int) string {

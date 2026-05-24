@@ -21,7 +21,7 @@ var statusCmd = &cobra.Command{
 func runStatus() {
 	titleStyle := lipgloss.NewStyle().Bold(true)
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#111827"))
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E2E8F0"))
 	proStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
 	freeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B"))
 	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
@@ -144,11 +144,27 @@ func runStatus() {
 
 	// Upgrade prompt for free users
 	if tier == "free" {
+		highlightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
+		linkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#60A5FA")).Underline(true)
+
 		fmt.Println()
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("  Upgrade to Pro:"))
-		fmt.Println("    contextsync upgrade")
+		fmt.Println(titleStyle.Render("Plans (Early Adopter Pricing):"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("Monthly:"),
+			highlightStyle.Render("$9/mo")+"  "+lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("(reg. $29/mo — save $20/mo, 69% off)"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("Quarterly:"),
+			highlightStyle.Render("$24/3mo")+"  "+lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("(reg. $79/3mo — save $55, 70% off)"))
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("Yearly:"),
+			highlightStyle.Render("$89/yr")+"  "+lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("(reg. $318/yr — save $229, 72% off)"))
+
+		deadlineDateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#1a1a2e")).Background(lipgloss.Color("#FBBF24")).Bold(true).Padding(1, 2)
+		deadlineTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true)
+
 		fmt.Println()
-		fmt.Println("  Plans: Monthly $9 | Quarterly $24 | Yearly $89")
+		fmt.Print(deadlineTextStyle.Render("  Early adopter pricing ends "))
+		fmt.Print(deadlineDateStyle.Render("June 30, 2026"))
+		fmt.Println(deadlineTextStyle.Render(" — lock in your rate now!"))
+		fmt.Println("    Upgrade: contextsync upgrade")
+		fmt.Println("    Pricing: " + linkStyle.Render("https://contextsync.yangqing.one/pricing"))
 	}
 
 	fmt.Println()
