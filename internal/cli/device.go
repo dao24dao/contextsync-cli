@@ -72,6 +72,9 @@ func registerDevice() error {
 			}
 			json.NewDecoder(resp.Body).Decode(&result)
 			resp.Body.Close()
+			if result.DeviceLimit <= 1 {
+				return fmt.Errorf("Free tier supports 1 device only. Upgrade to Pro for up to 3 devices with cloud sync")
+			}
 			return fmt.Errorf("device limit reached (%d/%d). Please remove a device from your dashboard", result.DeviceCount, result.DeviceLimit)
 		}
 

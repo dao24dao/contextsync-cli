@@ -16,6 +16,7 @@ const (
 	PromptOnTrialExpired                // When trial has expired
 	PromptOnSyncAttempt                 // When trying to use cloud sync
 	PromptOnMemoryExpiring              // When memories are about to expire
+	PromptOnDeviceLimit                 // When hitting device limit
 )
 
 // PromptConfig defines when and what to show
@@ -100,6 +101,23 @@ func (v *Validator) ShouldPromptForSync() *PromptConfig {
 		Message: "Free tier: No cloud sync\nPro tier: Sync memories across all your devices",
 		Cta:     "contextsync upgrade",
 	}
+}
+
+// ShouldPromptForDeviceLimit checks if user needs upgrade for more devices
+func (v *Validator) ShouldPromptForDeviceLimit(currentDevices int) *PromptConfig {
+	if v.IsPro() {
+		return nil
+	}
+
+	if currentDevices >= 1 {
+		return &PromptConfig{
+			Type:    PromptOnDeviceLimit,
+			Trigger: "Free tier supports 1 device only",
+			Message: "Need ContextSync on another device?\nPro tier: Sync across up to 3 devices",
+			Cta:     "contextsync upgrade",
+		}
+	}
+	return nil
 }
 
 // FormatPrompt formats a prompt for display

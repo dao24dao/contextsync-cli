@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -65,59 +66,51 @@ func (d *Detector) DetectAll() []*Tool {
 	return tools
 }
 
-// Configure configures MCP for a tool
+// Configure configures MCP for a tool with --tool parameter
 func (t *Tool) Configure() error {
-	// Create config directory if needed
 	dir := filepath.Dir(t.ConfigPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
-	// Check if config already exists
 	existingConfig, _ := os.ReadFile(t.ConfigPath)
 
-	// Create MCP config based on whether config exists
 	var config []byte
 	if len(existingConfig) > 0 {
-		// Merge with existing config
-		config = mergeMCPConfig(existingConfig)
+		config = mergeMCPConfig(existingConfig, t.Name)
 	} else {
-		// Create new config
-		config = newMCPConfig()
+		config = newMCPConfig(t.Name)
 	}
 
 	return os.WriteFile(t.ConfigPath, config, 0644)
 }
 
-func newMCPConfig() []byte {
-	return []byte(`{
+func newMCPConfig(toolName string) []byte {
+	return []byte(fmt.Sprintf(`{
   "mcpServers": {
     "contextsync": {
       "command": "contextsync",
-      "args": ["server"]
+      "args": ["server", "--tool", %q]
     }
   }
-}`)
+}`, toolName))
 }
 
-func mergeMCPConfig(existing []byte) []byte {
+func mergeMCPConfig(existing []byte, toolName string) []byte {
 	var config map[string]interface{}
 	if err := json.Unmarshal(existing, &config); err != nil {
-		// If parsing fails, create new config
-		return newMCPConfig()
+		return newMCPConfig(toolName)
 	}
 
-	// Ensure mcpServers exists
 	mcpServers, ok := config["mcpServers"].(map[string]interface{})
 	if !ok {
 		mcpServers = make(map[string]interface{})
 		config["mcpServers"] = mcpServers
 	}
 
-	// Add contextsync server
 	mcpServers["contextsync"] = map[string]interface{}{
 		"command": "contextsync",
-		"args":    []string{"server"},
+		"args":    []string{"server", "--tool", toolName},
 	}
 
 	result, _ := json.MarshalIndent(config, "", "  ")

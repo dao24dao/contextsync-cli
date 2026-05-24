@@ -2,13 +2,19 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"contextsync/internal/config"
 	"contextsync/internal/daemon"
 	"contextsync/internal/integrations"
+	toolstore "contextsync/internal/tools"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
@@ -91,17 +97,16 @@ func runInit() {
 	// Step 3: Detect AI tools
 	fmt.Println(infoStyle.Render("  Detecting AI tools..."))
 	detector := integrations.NewDetector()
-	tools := detector.DetectAll()
+	detectedTools := detector.DetectAll()
 
-	// Styles for interactive selection
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
 	disabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
 	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
 
-	if len(tools) == 0 {
+	if len(detectedTools) == 0 {
 		fmt.Println("  No AI tools detected")
 	} else {
-		for _, tool := range tools {
+		for _, tool := range detectedTools {
 			fmt.Printf("  Found: %s\n", tool.Name)
 		}
 	}
@@ -110,11 +115,10 @@ func runInit() {
 	// Step 4: Tool selection for Free tier
 	var toolsToConfigure []*integrations.Tool
 
-	if !validator.IsPro() && len(tools) > maxTools {
-		// Free tier: let user select which tools to configure
-		toolsToConfigure = selectToolsInteractive(tools, maxTools, titleStyle, selectedStyle, disabledStyle, hintStyle)
+	if !validator.IsPro() && len(detectedTools) > maxTools {
+		toolsToConfigure = selectToolsInteractive(detectedTools, maxTools, titleStyle, selectedStyle, disabledStyle, hintStyle)
 	} else {
-		toolsToConfigure = tools
+		toolsToConfigure = detectedTools
 	}
 
 	// Step 5: Configure MCP for each tool
@@ -130,9 +134,31 @@ func runInit() {
 			}
 		}
 		fmt.Println()
+
+		// Save encrypted tool list to tools.enc
+		toolNames := make([]string, len(toolsToConfigure))
+		for i, t := range toolsToConfigure {
+			toolNames[i] = t.Name
+		}
+		if err := toolstore.Save(&toolstore.ToolStore{
+			Tools:     toolNames,
+			AccountID: config.GetAccountID(),
+		}); err != nil {
+			fmt.Printf("  Warning: Failed to save tool config: %v\n", err)
+		} else {
+			fmt.Println(successStyle.Render("  Tool configuration saved"))
+		}
+
+		// Sync to cloud (best effort)
+		if err := syncToolsToCloud(toolNames); err != nil {
+			fmt.Printf("  Warning: Cloud sync skipped: %v\n", err)
+		} else {
+			fmt.Println(successStyle.Render("  Tool list synced to cloud"))
+		}
+		fmt.Println()
 	}
 
-	// Step 5: Create default rules
+	// Step 6: Create default rules
 	fmt.Println(infoStyle.Render("  Creating default rules file..."))
 	if err := config.CreateDefaultRules(); err != nil {
 		fmt.Printf("  %v\n", err)
@@ -140,7 +166,7 @@ func runInit() {
 		fmt.Println(successStyle.Render("  Created ~/.contextsync/rules.md\n"))
 	}
 
-	// Step 6: Install daemon service
+	// Step 7: Install daemon service
 	fmt.Println(infoStyle.Render("  Setting up daemon..."))
 	svc := daemon.NewServiceManager()
 
@@ -151,7 +177,6 @@ func runInit() {
 			fmt.Printf("  Warning: Failed to install daemon: %v\n", err)
 		} else {
 			fmt.Println(successStyle.Render("  Daemon service installed"))
-			// Start the daemon
 			if err := svc.Start(); err != nil {
 				fmt.Printf("  Warning: Failed to start daemon: %v\n", err)
 			} else {
@@ -162,7 +187,7 @@ func runInit() {
 	fmt.Println()
 
 	// Done
-	fmt.Println(titleStyle.Render("ContextSync initialized successfully!\n"))
+	fmt.Println(titleStyle.Render("ContextSync initialized successfully! (2/2)\n"))
 	fmt.Println("  Next steps:")
 	fmt.Println("  1. Edit your rules: contextsync rules edit")
 	fmt.Println("  2. View status: contextsync status")
@@ -191,8 +216,46 @@ func recordToolConfiguration(name, configPath string) {
 }
 
 func init() {
-	// Add force flag to bypass limits
 	initCmd.Flags().BoolP("force", "f", false, "Force configure all tools (ignores limits)")
+}
+
+// syncToolsToCloud syncs the tool list to the server (best effort)
+func syncToolsToCloud(toolNames []string) error {
+	serverURL := config.GetServerURL()
+	token := config.GetAuthToken()
+	accountID := config.GetAccountID()
+	if serverURL == "" || token == "" || accountID == "" {
+		return fmt.Errorf("not logged in")
+	}
+
+	body := map[string]interface{}{
+		"tools": toolNames,
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		serverURL+"/api/v1/tools",
+		bytes.NewReader(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("network error")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("server returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // selectToolsInteractive displays an interactive tool selector for Free tier
