@@ -45,6 +45,7 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(statsCmd)
+	rootCmd.AddCommand(driftAuditCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(serverCmd)
 	rootCmd.AddCommand(upgradeCmd)
