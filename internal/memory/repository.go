@@ -342,6 +342,18 @@ type Stats struct {
 	Expired  int
 }
 
+// ExtendedStats adds richer counters useful for the `stats` command.
+type ExtendedStats struct {
+	Stats
+	TotalCharacters    int
+	AverageCharacters  int
+	OldestCreatedAt    *time.Time
+	NewestCreatedAt    *time.Time
+	UnsyncedCount      int
+	ByCategory         map[string]int
+	ByProject          map[string]int
+}
+
 // GetStats returns memory statistics
 func (r *Repository) GetStats() Stats {
 	var stats Stats
@@ -369,6 +381,98 @@ func (r *Repository) GetStats() Stats {
 	`).Scan(&stats.Expired)
 
 	return stats
+}
+
+// GetExtendedStats returns richer statistics for the `contextsync stats` command.
+// Free users see only non-expired memories (mirrors GetStats / List behavior).
+func (r *Repository) GetExtendedStats() ExtendedStats {
+	es := ExtendedStats{
+		Stats:      r.GetStats(),
+		ByCategory: map[string]int{},
+		ByProject:  map[string]int{},
+	}
+
+	visibilityClause := ""
+	if !r.isPro() {
+		visibilityClause = "WHERE (expires_at IS NULL OR expires_at > datetime('now'))"
+	}
+
+	// Total characters + average length
+	var totalChars sql.NullInt64
+	r.db.QueryRow(fmt.Sprintf(`
+		SELECT COALESCE(SUM(LENGTH(content)), 0) FROM memories %s
+	`, visibilityClause)).Scan(&totalChars)
+	es.TotalCharacters = int(totalChars.Int64)
+	if es.Total > 0 {
+		es.AverageCharacters = es.TotalCharacters / es.Total
+	}
+
+	// Oldest / newest created_at (parse both RFC3339 and SQLite "YYYY-MM-DD HH:MM:SS")
+	var oldest, newest sql.NullString
+	r.db.QueryRow(fmt.Sprintf(`
+		SELECT MIN(created_at), MAX(created_at) FROM memories %s
+	`, visibilityClause)).Scan(&oldest, &newest)
+	if oldest.Valid {
+		if t, ok := parseFlexibleTime(oldest.String); ok {
+			es.OldestCreatedAt = &t
+		}
+	}
+	if newest.Valid {
+		if t, ok := parseFlexibleTime(newest.String); ok {
+			es.NewestCreatedAt = &t
+		}
+	}
+
+	// Unsynced count (only meaningful when synced=0 rows exist)
+	r.db.QueryRow(`SELECT COUNT(*) FROM memories WHERE synced = 0`).Scan(&es.UnsyncedCount)
+
+	// By category
+	if rows, err := r.db.Query(fmt.Sprintf(`
+		SELECT category, COUNT(*) FROM memories %s GROUP BY category
+	`, visibilityClause)); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var cat string
+			var n int
+			if err := rows.Scan(&cat, &n); err == nil {
+				es.ByCategory[cat] = n
+			}
+		}
+	}
+
+	// By project (only count non-empty projects)
+	projectClause := visibilityClause
+	if projectClause == "" {
+		projectClause = "WHERE project IS NOT NULL AND project != ''"
+	} else {
+		projectClause += " AND project IS NOT NULL AND project != ''"
+	}
+	if rows, err := r.db.Query(fmt.Sprintf(`
+		SELECT project, COUNT(*) FROM memories %s GROUP BY project ORDER BY 2 DESC LIMIT 10
+	`, projectClause)); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var proj string
+			var n int
+			if err := rows.Scan(&proj, &n); err == nil {
+				es.ByProject[proj] = n
+			}
+		}
+	}
+
+	return es
+}
+
+// parseFlexibleTime accepts both RFC3339 and SQLite's default
+// "YYYY-MM-DD HH:MM:SS" format.
+func parseFlexibleTime(s string) (time.Time, bool) {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
 }
 
 func (r *Repository) scanMemories(rows *sql.Rows) []*Memory {

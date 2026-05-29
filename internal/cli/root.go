@@ -44,6 +44,7 @@ func init() {
 	// Add commands
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(statsCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(serverCmd)
 	rootCmd.AddCommand(upgradeCmd)
