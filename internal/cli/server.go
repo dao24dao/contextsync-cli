@@ -57,7 +57,7 @@ func runServer() {
 	}
 	defer closeDatabase()
 
-	server := mcp.NewServer(database)
+	server := mcp.NewServerWithIdentity(database, config.GetServerURL(), config.GetAccountID(), config.GetDeviceID())
 
 	if err := server.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
@@ -77,7 +77,10 @@ func validateToolAccess(name string) error {
 	}
 
 	// License check: enforce tool count limit for Free tier
-	licValidator := license.NewValidator("")
+	ensureDatabase()
+	licValidator := license.NewValidator(config.GetServerURL())
+	licValidator.SetIdentity(config.GetAccountID(), config.GetDeviceID())
+	licValidator.SetDB(database)
 	count, err := tools.GetToolCount()
 	if err == nil && !licValidator.IsPro() {
 		maxTools := licValidator.GetMaxTools()

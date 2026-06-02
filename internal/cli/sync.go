@@ -46,8 +46,9 @@ func runSync() {
 	// Get license key
 	var licenseKey string
 	database.DB().QueryRow("SELECT license_key FROM license WHERE id = 1").Scan(&licenseKey)
-	if licenseKey == "" {
-		fmt.Println(errorStyle.Render("  No license key found. Please activate first.\n"))
+	accountID := config.GetAccountID()
+	if accountID == "" && licenseKey == "" {
+		fmt.Println(errorStyle.Render("  Please login or activate a license before syncing.\n"))
 		return
 	}
 
@@ -88,7 +89,7 @@ func runSync() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	remoteMemories, deletedIDs, err := client.MergeAndSync(ctx, licenseKey, deviceID, unsynced, lastSync)
+	remoteMemories, deletedIDs, err := client.MergeAndSync(ctx, accountID, licenseKey, deviceID, unsynced, lastSync)
 	if err != nil {
 		fmt.Println(errorStyle.Render(fmt.Sprintf("\n  Sync failed: %v\n", err)))
 		return

@@ -44,7 +44,8 @@ func runUpgrade() {
 		if subType != "" {
 			fmt.Printf("\n  Plan: %s\n", subType)
 		}
-		fmt.Println("\n  Run 'contextsync status' for details.\n")
+		fmt.Println("\n  Run 'contextsync status' for details.")
+		fmt.Println()
 		return
 	}
 
@@ -52,7 +53,8 @@ func runUpgrade() {
 	if !config.IsLoggedIn() {
 		fmt.Println(warnStyle.Render("  Not logged in"))
 		fmt.Println("\n  Please login first:")
-		fmt.Println("    contextsync login\n")
+		fmt.Println("    contextsync login")
+		fmt.Println()
 		return
 	}
 
@@ -68,14 +70,16 @@ func runUpgrade() {
 	fmt.Println("    - 2 tools only")
 	fmt.Println("    - 14-day memory retention")
 	fmt.Println("    - Read-only memory access")
-	fmt.Println("    - No cloud sync\n")
+	fmt.Println("    - No cloud sync")
+	fmt.Println()
 
 	fmt.Println(proStyle.Render("  Pro Tier:"))
 	fmt.Println("    - All 12+ AI tools")
 	fmt.Println("    - Permanent memory retention")
 	fmt.Println("    - Unlimited memory storage")
 	fmt.Println("    - Cloud sync across devices (3 devices)")
-	fmt.Println("    - Priority support\n")
+	fmt.Println("    - Priority support")
+	fmt.Println()
 
 	// Subscription plans
 	fmt.Println(titleStyle.Render("Subscription Plans:\n"))

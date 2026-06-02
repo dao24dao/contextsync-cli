@@ -144,7 +144,8 @@ func runUpdate() {
 
 	fmt.Println(successStyle.Render("\n✅ ContextSync CLI updated successfully!"))
 	fmt.Printf("\nNew version: %s\n", latestVersion)
-	fmt.Println("\nRun 'contextsync version' to verify.\n")
+	fmt.Println("\nRun 'contextsync version' to verify.")
+	fmt.Println()
 }
 
 func getLatestReleaseURL(baseURL string) (string, error) {
@@ -243,8 +244,8 @@ func extractFile(archive, expectedDest, goos string) (string, error) {
 	// Find the extracted binary (may have platform suffix like contextsync-darwin-arm64)
 	var extractedBinary string
 	candidates := []string{
-		expectedDest,                              // contextsync
-		dir + "/contextsync",                      // contextsync
+		expectedDest,         // contextsync
+		dir + "/contextsync", // contextsync
 	}
 
 	// Also check for platform-suffixed binary

@@ -89,6 +89,7 @@ func initDatabase() error {
 
 	// Initialize license validator
 	validator = license.NewValidator(config.GetServerURL())
+	validator.SetIdentity(config.GetAccountID(), config.GetDeviceID())
 	validator.SetDB(database)
 
 	return nil

@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	TrialDays        = 14
-	SignatureMaxAge  = 7 * 24 * time.Hour // Signature valid for 7 days offline
+	TrialDays       = 14
+	SignatureMaxAge = 7 * 24 * time.Hour // Signature valid for 7 days offline
 )
 
 // Embedded public key for signature verification
@@ -27,6 +27,8 @@ var embeddedPublicKey ed25519.PublicKey
 type Validator struct {
 	db         *sql.DB
 	serverURL  string
+	accountID  string
+	deviceID   string
 	httpClient *http.Client
 	cache      *LicenseCache
 	mu         sync.RWMutex
@@ -67,7 +69,7 @@ const (
 type SubscriptionPlan struct {
 	ID           SubscriptionType
 	Name         string
-	Price        int    // in cents
+	Price        int // in cents
 	PriceDisplay string
 	Savings      string
 }
@@ -84,6 +86,10 @@ type Features struct {
 	CanSync         bool   `json:"can_sync"`
 	CanSaveMemory   bool   `json:"can_save_memory"`
 	TrialExpired    bool   `json:"trial_expired"`
+}
+
+func isPaidTier(tier string) bool {
+	return tier == "pro" || tier == "team"
 }
 
 // SetPublicKey sets the embedded public key for signature verification
@@ -103,9 +109,18 @@ func SetPublicKey(pubKeyBase64 string) error {
 func NewValidator(serverURL string) *Validator {
 	return &Validator{
 		serverURL: serverURL,
+		deviceID:  "local",
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+	}
+}
+
+// SetIdentity sets the current account and device used for server validation.
+func (v *Validator) SetIdentity(accountID, deviceID string) {
+	v.accountID = accountID
+	if deviceID != "" {
+		v.deviceID = deviceID
 	}
 }
 
@@ -189,7 +204,7 @@ func (v *Validator) IsPro() bool {
 		status, err := v.validateWithServer(ctx)
 		if err == nil {
 			v.updateCacheFromServer(status)
-			return status.Tier == "pro" && status.Valid
+			return isPaidTier(status.Tier) && status.Valid
 		}
 	}
 
@@ -204,7 +219,7 @@ func (v *Validator) isProFromCache() bool {
 	}
 
 	// Free tier doesn't need signature
-	if v.cache.Tier != "pro" {
+	if !isPaidTier(v.cache.Tier) {
 		return false
 	}
 
@@ -247,7 +262,7 @@ func (v *Validator) updateCacheFromServer(status *LicenseStatus) {
 	}
 
 	// Update database
-	if v.db != nil && status.Tier == "pro" {
+	if v.db != nil && isPaidTier(status.Tier) {
 		v.db.Exec(`
 			UPDATE license SET
 				tier = ?,
@@ -381,7 +396,8 @@ func (v *Validator) Activate(licenseKey string) error {
 
 	body := map[string]string{
 		"license_key": licenseKey,
-		"device_id":   "local", // TODO: get from config
+		"account_id":  v.accountID,
+		"device_id":   v.deviceID,
 	}
 
 	jsonBody, _ := json.Marshal(body)
@@ -454,13 +470,14 @@ func (v *Validator) validateWithServer(ctx context.Context) (*LicenseStatus, err
 		v.db.QueryRow("SELECT license_key FROM license WHERE id = 1").Scan(&licenseKey)
 	}
 
-	if licenseKey == "" {
+	if licenseKey == "" && v.accountID == "" {
 		return &LicenseStatus{Tier: "free", Valid: true}, nil
 	}
 
 	body := map[string]string{
 		"license_key": licenseKey,
-		"device_id":   "local",
+		"account_id":  v.accountID,
+		"device_id":   v.deviceID,
 	}
 
 	jsonBody, _ := json.Marshal(body)

@@ -79,5 +79,6 @@ func runDoctor() {
 	}
 
 	fmt.Println()
-	fmt.Println("  Run 'contextsync init' to set up ContextSync.\n")
+	fmt.Println("  Run 'contextsync init' to set up ContextSync.")
+	fmt.Println()
 }

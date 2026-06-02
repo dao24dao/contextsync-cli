@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
+	"contextsync/internal/cloud"
 	"contextsync/internal/db"
 	"contextsync/internal/license"
 	"contextsync/internal/memory"
@@ -18,11 +20,20 @@ type Server struct {
 	memory    *memory.Repository
 	rules     *rules.Engine
 	license   *license.Validator
+	cloud     *cloud.Client
+	accountID string
+	deviceID  string
 }
 
 // NewServer creates a new MCP server
 func NewServer(database *db.SQLite) *Server {
-	licValidator := license.NewValidator("")
+	return NewServerWithIdentity(database, "", "", "")
+}
+
+// NewServerWithIdentity creates a new MCP server for the current account/device.
+func NewServerWithIdentity(database *db.SQLite, serverURL, accountID, deviceID string) *Server {
+	licValidator := license.NewValidator(serverURL)
+	licValidator.SetIdentity(accountID, deviceID)
 	licValidator.SetDB(database)
 
 	// Pass Pro checker to memory repository
@@ -30,9 +41,14 @@ func NewServer(database *db.SQLite) *Server {
 	rulesEngine := rules.NewEngine()
 
 	s := &Server{
-		memory:  memRepo,
-		rules:   rulesEngine,
-		license: licValidator,
+		memory:    memRepo,
+		rules:     rulesEngine,
+		license:   licValidator,
+		accountID: accountID,
+		deviceID:  deviceID,
+	}
+	if serverURL != "" {
+		s.cloud = cloud.NewClient(serverURL)
 	}
 
 	// Create MCP server with v1.6.0 API
@@ -149,13 +165,28 @@ Run: contextsync upgrade`},
 		return nil, nil, err
 	}
 
-	// TODO: Sync to cloud in background
+	s.syncMemoryBestEffort(mem)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Memory saved.\n\nCategory: %s\nID: %s", mem.Category, mem.ID)},
 		},
 	}, nil, nil
+}
+
+func (s *Server) syncMemoryBestEffort(mem *memory.Memory) {
+	if s.cloud == nil || s.accountID == "" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if _, err := s.cloud.Upload(ctx, s.accountID, "", s.deviceID, []*memory.Memory{mem}); err != nil {
+		return
+	}
+
+	_ = s.memory.MarkSynced([]string{mem.ID})
 }
 
 func (s *Server) handleGetRules(ctx context.Context, req *mcp.CallToolRequest, args getRulesArgs) (*mcp.CallToolResult, any, error) {

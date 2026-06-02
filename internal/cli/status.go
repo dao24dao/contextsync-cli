@@ -90,14 +90,20 @@ func runStatus() {
 
 	// Initialize validator
 	validator := license.NewValidator(config.GetServerURL())
+	validator.SetIdentity(config.GetAccountID(), config.GetDeviceID())
 	validator.SetDB(database)
 
-	// License tier
-	tier := validator.GetTier()
+	// License tier. GetFeatures validates with the server when possible.
 	features := validator.GetFeatures()
+	tier := validator.GetTier()
+	isPaid := tier == "pro" || tier == "team"
 
-	if tier == "pro" {
-		fmt.Printf("  %-12s %s\n", labelStyle.Render("License:"), proStyle.Render("Pro"))
+	if isPaid {
+		displayTier := "Pro"
+		if tier == "team" {
+			displayTier = "Team Pro"
+		}
+		fmt.Printf("  %-12s %s\n", labelStyle.Render("License:"), proStyle.Render(displayTier))
 		if subType := validator.GetSubscriptionType(); subType != "" {
 			fmt.Printf("  %-12s %s\n", labelStyle.Render("Plan:"), subType)
 		}
@@ -115,13 +121,13 @@ func runStatus() {
 	var toolCount int
 	database.DB().QueryRow("SELECT COUNT(*) FROM configured_tools").Scan(&toolCount)
 	maxTools := features.MaxTools
-	if tier == "pro" {
+	if isPaid {
 		maxTools = 999 // Unlimited
 	}
 
 	fmt.Println()
 	fmt.Println(titleStyle.Render("Tools:"))
-	if tier == "pro" {
+	if isPaid {
 		fmt.Printf("  %-12s %d configured (unlimited)\n", labelStyle.Render("Count:"), toolCount)
 	} else {
 		fmt.Printf("  %-12s %d / %d\n", labelStyle.Render("Count:"), toolCount, maxTools)

@@ -247,8 +247,9 @@ func (d *Daemon) syncMemories() {
 	// Get license key
 	var licenseKey string
 	d.db.QueryRow("SELECT license_key FROM license WHERE id = 1").Scan(&licenseKey)
-	if licenseKey == "" {
-		logger.Debug("No license key, skipping sync")
+	accountID := config.GetAccountID()
+	if accountID == "" && licenseKey == "" {
+		logger.Debug("No account or license key, skipping sync")
 		return
 	}
 
@@ -293,7 +294,7 @@ func (d *Daemon) syncMemories() {
 	}
 
 	// Perform sync
-	remoteMemories, deletedIDs, err := d.cloudClient.MergeAndSync(ctx, licenseKey, deviceID, memories, lastSync)
+	remoteMemories, deletedIDs, err := d.cloudClient.MergeAndSync(ctx, accountID, licenseKey, deviceID, memories, lastSync)
 	if err != nil {
 		logger.Error("Sync failed: %v", err)
 		return

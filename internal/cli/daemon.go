@@ -163,7 +163,8 @@ func daemonStatus() {
 
 	svc := daemon.NewServiceManager()
 
-	fmt.Println("\n  ContextSync Daemon Status\n")
+	fmt.Println("\n  ContextSync Daemon Status")
+	fmt.Println()
 
 	// Check if installed
 	if !svc.IsInstalled() {
@@ -198,7 +199,8 @@ func installDaemon() {
 	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
 	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6"))
 
-	fmt.Println("\n  Installing ContextSync daemon...\n")
+	fmt.Println("\n  Installing ContextSync daemon...")
+	fmt.Println()
 
 	svc := daemon.NewServiceManager()
 

@@ -27,6 +27,7 @@ func activateLicense(key string) {
 
 	ensureDatabase()
 	validator := license.NewValidator(config.GetServerURL())
+	validator.SetIdentity(config.GetAccountID(), config.GetDeviceID())
 	validator.SetDB(database)
 
 	if err := validator.Activate(key); err != nil {
@@ -40,7 +41,8 @@ func activateLicense(key string) {
 	fmt.Println("    - All 6+ tools enabled")
 	fmt.Println("    - Permanent memory retention")
 	fmt.Println("    - Unlimited memory storage")
-	fmt.Println("    - Cloud sync enabled\n")
+	fmt.Println("    - Cloud sync enabled")
+	fmt.Println()
 }
 
 var deactivateCmd = &cobra.Command{
@@ -54,9 +56,11 @@ var deactivateCmd = &cobra.Command{
 func deactivateLicense() {
 	ensureDatabase()
 	validator := license.NewValidator(config.GetServerURL())
+	validator.SetIdentity(config.GetAccountID(), config.GetDeviceID())
 	validator.SetDB(database)
 	validator.Deactivate()
 
 	fmt.Println("\n  License deactivated.")
-	fmt.Println("  You are now on the Free tier.\n")
+	fmt.Println("  You are now on the Free tier.")
+	fmt.Println()
 }

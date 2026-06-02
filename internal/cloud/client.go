@@ -26,6 +26,7 @@ func NewClient(serverURL string) *Client {
 }
 
 type SyncRequest struct {
+	AccountID  string       `json:"account_id"`
 	LicenseKey string       `json:"license_key"`
 	DeviceID   string       `json:"device_id"`
 	Memories   []SyncMemory `json:"memories"`
@@ -53,7 +54,7 @@ type SyncResponse struct {
 }
 
 // Upload uploads local memories to the cloud
-func (c *Client) Upload(ctx context.Context, licenseKey, deviceID string, memories []*memory.Memory) (*SyncResponse, error) {
+func (c *Client) Upload(ctx context.Context, accountID, licenseKey, deviceID string, memories []*memory.Memory) (*SyncResponse, error) {
 	// Convert memories to sync format
 	syncMemories := make([]SyncMemory, len(memories))
 	for i, m := range memories {
@@ -71,6 +72,7 @@ func (c *Client) Upload(ctx context.Context, licenseKey, deviceID string, memori
 	}
 
 	req := SyncRequest{
+		AccountID:  accountID,
 		LicenseKey: licenseKey,
 		DeviceID:   deviceID,
 		Memories:   syncMemories,
@@ -106,8 +108,9 @@ func (c *Client) Upload(ctx context.Context, licenseKey, deviceID string, memori
 }
 
 // Download downloads memories from the cloud
-func (c *Client) Download(ctx context.Context, licenseKey, deviceID string, lastSync int64) (*SyncResponse, error) {
+func (c *Client) Download(ctx context.Context, accountID, licenseKey, deviceID string, lastSync int64) (*SyncResponse, error) {
 	req := SyncRequest{
+		AccountID:  accountID,
 		LicenseKey: licenseKey,
 		DeviceID:   deviceID,
 		LastSync:   lastSync,
@@ -142,15 +145,15 @@ func (c *Client) Download(ctx context.Context, licenseKey, deviceID string, last
 }
 
 // MergeAndSync performs a bidirectional sync
-func (c *Client) MergeAndSync(ctx context.Context, licenseKey, deviceID string, localMemories []*memory.Memory, lastSync int64) ([]*memory.Memory, []string, error) {
+func (c *Client) MergeAndSync(ctx context.Context, accountID, licenseKey, deviceID string, localMemories []*memory.Memory, lastSync int64) ([]*memory.Memory, []string, error) {
 	// First, download remote changes
-	downloadResult, err := c.Download(ctx, licenseKey, deviceID, lastSync)
+	downloadResult, err := c.Download(ctx, accountID, licenseKey, deviceID, lastSync)
 	if err != nil {
 		return nil, nil, fmt.Errorf("download failed: %w", err)
 	}
 
 	// Then, upload local changes
-	_, err = c.Upload(ctx, licenseKey, deviceID, localMemories)
+	_, err = c.Upload(ctx, accountID, licenseKey, deviceID, localMemories)
 	if err != nil {
 		return nil, nil, fmt.Errorf("upload failed: %w", err)
 	}

@@ -48,7 +48,8 @@ func runInit() {
 	if !config.IsLoggedIn() {
 		fmt.Println(warnStyle.Render("  Not logged in"))
 		fmt.Println("\n  Please login first to use ContextSync:")
-		fmt.Println("    contextsync login\n")
+		fmt.Println("    contextsync login")
+		fmt.Println()
 		return
 	}
 
@@ -89,7 +90,7 @@ func runInit() {
 		if subType != "" {
 			fmt.Printf(" (%s)", subType)
 		}
-		fmt.Println("\n")
+		fmt.Println()
 	} else {
 		fmt.Printf("  Free tier: Max %d tools\n\n", maxTools)
 	}
@@ -191,7 +192,8 @@ func runInit() {
 	fmt.Println("  Next steps:")
 	fmt.Println("  1. Edit your rules: contextsync rules edit")
 	fmt.Println("  2. View status: contextsync status")
-	fmt.Println("  3. Start MCP server: contextsync server\n")
+	fmt.Println("  3. Start MCP server: contextsync server")
+	fmt.Println()
 }
 
 func getPreviouslyConfiguredCount() int {

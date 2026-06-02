@@ -37,6 +37,7 @@ func runStats() {
 	tier := "free"
 	if config.IsLoggedIn() {
 		v := license.NewValidator(config.GetServerURL())
+		v.SetIdentity(config.GetAccountID(), config.GetDeviceID())
 		v.SetDB(database)
 		tier = v.GetTier()
 	}
