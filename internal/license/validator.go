@@ -61,9 +61,8 @@ type LicenseStatus struct {
 type SubscriptionType string
 
 const (
-	SubscriptionMonthly   SubscriptionType = "monthly"
-	SubscriptionQuarterly SubscriptionType = "quarterly"
-	SubscriptionYearly    SubscriptionType = "yearly"
+	SubscriptionMonthly SubscriptionType = "monthly"
+	SubscriptionYearly  SubscriptionType = "yearly"
 )
 
 type SubscriptionPlan struct {
@@ -75,9 +74,8 @@ type SubscriptionPlan struct {
 }
 
 var SubscriptionPlans = []SubscriptionPlan{
-	{SubscriptionMonthly, "Monthly", 900, "$9/month", ""},
-	{SubscriptionQuarterly, "Quarterly", 2400, "$24/quarter", "Save 11%"},
-	{SubscriptionYearly, "Yearly", 8900, "$89/year", "Save 18%"},
+	{SubscriptionMonthly, "Monthly", 1900, "$19/month", ""},
+	{SubscriptionYearly, "Yearly", 17900, "$179/year", "Save 21%"},
 }
 
 type Features struct {
@@ -316,8 +314,6 @@ func (v *Validator) GetSubscriptionDisplayName() string {
 	switch subType {
 	case SubscriptionMonthly:
 		return "Monthly"
-	case SubscriptionQuarterly:
-		return "Quarterly"
 	case SubscriptionYearly:
 		return "Yearly"
 	default:
