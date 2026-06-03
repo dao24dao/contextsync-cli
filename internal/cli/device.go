@@ -111,7 +111,10 @@ var deviceListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all registered devices",
 	Long:  "List all devices registered to your ContextSync account.",
-	Run:   runDeviceList,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		runDeviceList()
+		return nil
+	},
 }
 
 // deviceRemoveCmd removes a device from your account.
