@@ -41,10 +41,9 @@ var toolDefinitions = []struct {
 
 	// Tier 3: Specialized tools
 	{"Cline", "mcp.json", ".cline"},
-	{"Roo Code", "mcp.json", ".roo"},
 	{"Aider", "mcp.json", ".aider"},
 	{"Continue", "config.json", ".continue"},
-	{"Replit AI", "mcp.json", ".replit"},
+	{"Zed", "settings.json", ".zed"},
 }
 
 // DetectAll detects all installed AI tools

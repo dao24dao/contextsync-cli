@@ -107,7 +107,7 @@ func runRulesSync() {
 		"Roo Code":       filepath.Join(home, ".roo", "ROO.md"),
 		"Aider":          filepath.Join(home, ".aider", "AIDER.md"),
 		"Continue":       filepath.Join(home, ".continue", "CONTINUE.md"),
-		"Replit AI":      filepath.Join(home, ".replit", "REPLIT.md"),
+		"Zed":            filepath.Join(home, ".zed", "ZED.md"),
 	}
 
 	fmt.Println(infoStyle.Render("  Syncing rules to configured tools..."))
