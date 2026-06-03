@@ -7,7 +7,6 @@ import (
 
 	"contextsync/internal/config"
 	"contextsync/internal/integrations"
-	"contextsync/internal/license"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
