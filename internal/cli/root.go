@@ -55,6 +55,8 @@ func init() {
 	rootCmd.AddCommand(memoriesCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(deviceListCmd)
+	rootCmd.AddCommand(deviceRemoveCmd)
 }
 
 func initConfig() {
