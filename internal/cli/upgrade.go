@@ -83,14 +83,9 @@ func runUpgrade() {
 
 	// Subscription plans
 	fmt.Println(titleStyle.Render("Subscription Plans:\n"))
-
-	for _, plan := range license.SubscriptionPlans {
-		savingsText := ""
-		if plan.Savings != "" {
-			savingsText = fmt.Sprintf(" (%s)", plan.Savings)
-		}
-		fmt.Printf("  %-12s $%d %s\n", plan.Name+":", plan.Price/100, savingsText)
-	}
+	fmt.Printf("  %-12s $%d\n", "Monthly:", 19)
+	fmt.Println()
+	fmt.Printf("  %-12s $%d (= $14.9/mo) — Save 21%%\n", "Yearly:", 179)
 
 	// Build pricing URL
 	serverURL := config.GetServerURL()
