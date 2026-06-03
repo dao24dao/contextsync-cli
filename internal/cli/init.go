@@ -157,6 +157,19 @@ func runInit() {
 			fmt.Println(successStyle.Render("  Tool list synced to cloud"))
 		}
 		fmt.Println()
+
+		// Sync rules to cloud (best effort, non-blocking)
+		if validator.IsPro() && config.IsLoggedIn() {
+			rulesPath := config.GetRulesPath()
+			if content, err := os.ReadFile(rulesPath); err == nil && len(content) >= 10 {
+				if err := syncRulesToCloud(string(content)); err != nil {
+					fmt.Printf("  Warning: Rules cloud sync skipped: %v\n", err)
+				} else {
+					fmt.Println(successStyle.Render("  Rules synced to cloud"))
+				}
+			}
+		}
+		fmt.Println()
 	}
 
 	// Step 6: Create default rules
