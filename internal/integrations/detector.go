@@ -44,7 +44,6 @@ var toolDefinitions = []struct {
 	{"Roo Code", "mcp.json", ".roo"},
 	{"Aider", "mcp.json", ".aider"},
 	{"Continue", "config.json", ".continue"},
-	{"Zed", "settings.json", ".zed"},
 	{"Replit AI", "mcp.json", ".replit"},
 }
 

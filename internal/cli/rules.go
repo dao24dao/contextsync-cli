@@ -107,7 +107,6 @@ func runRulesSync() {
 		"Roo Code":       filepath.Join(home, ".roo", "ROO.md"),
 		"Aider":          filepath.Join(home, ".aider", "AIDER.md"),
 		"Continue":       filepath.Join(home, ".continue", "CONTINUE.md"),
-		"Zed":            filepath.Join(home, ".zed", "ZED.md"),
 		"Replit AI":      filepath.Join(home, ".replit", "REPLIT.md"),
 	}
 
