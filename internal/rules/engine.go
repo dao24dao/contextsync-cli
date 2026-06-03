@@ -66,6 +66,15 @@ func (e *Engine) extractSection(content, section string) string {
 	return strings.Join(result, "\n")
 }
 
+// GetContent reads and returns the raw rules file content.
+func (e *Engine) GetContent() (string, error) {
+	content, err := os.ReadFile(e.rulesPath)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
 // Compile compiles rules to all target formats
 func (e *Engine) Compile() error {
 	content, err := os.ReadFile(e.rulesPath)
